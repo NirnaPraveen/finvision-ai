@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "preferences": { "type": "object" },
+        "healthScore": { "type": "number" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Individual expense record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["personal", "shared", "income", "expense"] },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["userId", "amount", "category", "date"]
+    },
+    "SharedExpense": {
+      "title": "SharedExpense",
+      "description": "Expense shared between multiple users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "splits": { "type": "object" },
+        "status": { "type": "string", "enum": ["pending", "partially_paid", "settled"] }
+      },
+      "required": ["creatorId", "amount", "participants", "date"]
+    },
+    "Subscription": {
+      "title": "Subscription",
+      "description": "Recurring expense record with sharing support",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "name": { "type": "string" },
+        "amount": { "type": "number" },
+        "billingCycle": { "type": "string", "enum": ["monthly", "yearly"] },
+        "nextRenewal": { "type": "string", "format": "date-time" },
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "expiring_soon", "expired"] },
+        "isShared": { "type": "boolean" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "participantStatuses": { "type": "object" },
+        "splitAmount": { "type": "number" },
+        "logo": { "type": "string" }
+      },
+      "required": ["userId", "name", "amount", "billingCycle", "nextRenewal", "status"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notification and request system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "warning", "success", "reminder", "subscription_request"] },
+        "payload": { "type": "object" },
+        "read": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userEmail", "title", "message", "createdAt"]
+    },
+    "Settlement": {
+      "title": "Settlement",
+      "description": "Payment settlement between users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fromId": { "type": "string" },
+        "fromEmail": { "type": "string" },
+        "toId": { "type": "string" },
+        "toEmail": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid"] },
+        "reason": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "paymentMethod": { "type": "string" }
+      },
+      "required": ["fromEmail", "toEmail", "amount", "status", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profiles" },
+    "/expenses/{expenseId}": { "schema": "Expense", "description": "Individual expenses" },
+    "/shared_expenses/{sharedExpenseId}": { "schema": "SharedExpense", "description": "Shared expenses" },
+    "/subscriptions/{subscriptionId}": { "schema": "Subscription", "description": "User subscriptions" },
+    "/notifications/{notificationId}": { "schema": "Notification", "description": "User notifications" },
+    "/settlements/{settlementId}": { "schema": "Settlement", "description": "Debt settlements" }
+  }
+}

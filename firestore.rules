@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: uid, email, displayName, photoURL, createdAt
+    //
+    // Collection: expenses
+    // Fields: userId, amount, category, description, date, type
+    //
+    // Collection: shared_expenses
+    // Fields: creatorId, amount, description, category, date, participants (emails), splits, status
+    //
+    // Collection: subscriptions
+    // Fields: userId, userEmail, name, amount, billingCycle, nextRenewal, category, status, isShared, participants (emails), splitAmount
+    //
+    // Collection: notifications
+    // Fields: userId, userEmail, title, message, type, read, status, createdAt
+    //
+    // Collection: settlements
+    // Fields: fromId, fromEmail, toId, toEmail, amount, status, reason, date, paymentMethod
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isEmailOwner(email) {
+      return isAuthenticated() && request.auth.token.email == email;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+         (request.auth.token.email == "patilpraveen70657@gmail.com"));
+    }
+
+    // Validation Helpers
+    function isValidString(val, maxLen) {
+      return val is string && val.size() <= maxLen;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDate(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}.*Z?)?$");
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId) && 
+        request.resource.data.keys().hasAll(['uid', 'email']) &&
+        isValidString(request.resource.data.uid, 128) &&
+        isValidEmail(request.resource.data.email) &&
+        (!('role' in request.resource.data) || (request.resource.data.role == resource.data.role || isAdmin()));
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.amount is number &&
+        isValidString(request.resource.data.category, 50) &&
+        isValidDate(request.resource.data.date);
+      allow update, delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    match /shared_expenses/{sharedExpenseId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.creatorId || request.auth.token.email in resource.data.participants);
+      allow create: if isAuthenticated() && request.resource.data.creatorId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        (request.auth.uid == resource.data.creatorId || request.auth.token.email in resource.data.participants);
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.creatorId;
+    }
+
+    match /subscriptions/{subscriptionId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId || request.auth.token.email == resource.data.userEmail || request.auth.token.email in resource.data.participants);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId || request.auth.token.email == resource.data.userEmail || request.auth.token.email in resource.data.participants || isAdmin());
+      allow delete: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId || request.auth.token.email == resource.data.userEmail);
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+        (request.auth.uid == resource.data.userId || request.auth.token.email == resource.data.userEmail || isAdmin());
+    }
+
+    match /settlements/{settlementId} {
+      allow read: if isAuthenticated() && 
+        (request.auth.token.email == resource.data.fromEmail || request.auth.token.email == resource.data.toEmail);
+      allow create: if isAuthenticated() && 
+        (request.resource.data.fromEmail == request.auth.token.email || isAdmin());
+      allow update: if isAuthenticated() && 
+        (request.auth.token.email == resource.data.fromEmail || request.auth.token.email == resource.data.toEmail || isAdmin());
+    }
+  }
+}
